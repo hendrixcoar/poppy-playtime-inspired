@@ -1,0 +1,31 @@
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+*.keystore
+*.jks
+.gradle/
+
+# Visual Studio
+.vs/
+.vscode/
+*.csproj
+*.sln
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+out/
+*.exe
+*.dll
