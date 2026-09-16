@@ -1,23 +1,23 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 public class AudioManager : MonoBehaviour
 {
     public static AudioManager instance { get; private set; }
-
+    
     [System.Serializable]
-    public class AudioClipData
+    public class AudioClipReference
     {
-        public string clipID;
+        public string soundName;
         public AudioClip clip;
-        public float volume = 1f;
-        public bool loop = false;
+        [Range(0f, 1f)] public float volume = 1f;
     }
-
-    [SerializeField] private List<AudioClipData> audioClips = new List<AudioClipData>();
+    
+    [SerializeField] private AudioClipReference[] soundLibrary;
+    [SerializeField] private AudioSource musicAudioSource;
+    [SerializeField] private AudioSource sfxAudioSource;
     [SerializeField] private float masterVolume = 1f;
     
-    private Dictionary<string, AudioSource> activeSources = new Dictionary<string, AudioSource>();
+    private System.Collections.Generic.Dictionary<string, AudioClipReference> soundCache;
 
     private void Awake()
     {
@@ -28,61 +28,76 @@ public class AudioManager : MonoBehaviour
         }
         instance = this;
         DontDestroyOnLoad(gameObject);
-    }
-
-    public void PlaySound(string clipID, Vector3 position = default)
-    {
-        AudioClipData data = audioClips.Find(a => a.clipID == clipID);
-        if (data == null)
-        {
-            Debug.LogWarning($"Audio clip not found: {clipID}");
-            return;
-        }
-
-        AudioSource source = new GameObject($"Audio_{clipID}").AddComponent<AudioSource>();
-        source.clip = data.clip;
-        source.volume = data.volume * masterVolume;
-        source.loop = data.loop;
-        source.transform.position = position;
-        source.PlayOneShot(data.clip);
         
-        Destroy(source.gameObject, data.clip.length);
+        InitializeSoundCache();
     }
 
-    public void PlayAmbientMusic(string clipID)
+    private void InitializeSoundCache()
     {
-        if (activeSources.ContainsKey("music"))
+        soundCache = new System.Collections.Generic.Dictionary<string, AudioClipReference>();
+        
+        foreach (AudioClipReference audio in soundLibrary)
         {
-            Destroy(activeSources["music"].gameObject);
-            activeSources.Remove("music");
+            if (audio.clip != null)
+            {
+                soundCache[audio.soundName] = audio;
+            }
         }
+        
+        Debug.Log($"Audio cache initialized with {soundCache.Count} sounds");
+    }
 
-        AudioClipData data = audioClips.Find(a => a.clipID == clipID);
-        if (data == null)
+    public void PlaySound(string soundName, Vector3 position = default)
+    {
+        if (soundCache.ContainsKey(soundName))
         {
-            Debug.LogWarning($"Audio clip not found: {clipID}");
-            return;
+            AudioClipReference audioRef = soundCache[soundName];
+            
+            if (position != default)
+            {
+                // 3D audio at position
+                AudioSource.PlayClipAtPoint(audioRef.clip, position, audioRef.volume * masterVolume);
+            }
+            else if (sfxAudioSource != null)
+            {
+                // 2D audio through SFX source
+                sfxAudioSource.PlayOneShot(audioRef.clip, audioRef.volume * masterVolume);
+            }
+            
+            Debug.Log($"Playing sound: {soundName}");
         }
+        else
+        {
+            Debug.LogWarning($"Sound not found: {soundName}");
+        }
+    }
 
-        AudioSource source = new GameObject("Music_Source").AddComponent<AudioSource>();
-        source.clip = data.clip;
-        source.volume = data.volume * masterVolume;
-        source.loop = true;
-        source.Play();
-        activeSources["music"] = source;
+    public void PlayMusic(string musicName, bool loop = true)
+    {
+        if (soundCache.ContainsKey(musicName) && musicAudioSource != null)
+        {
+            AudioClipReference audioRef = soundCache[musicName];
+            musicAudioSource.clip = audioRef.clip;
+            musicAudioSource.volume = audioRef.volume * masterVolume;
+            musicAudioSource.loop = loop;
+            musicAudioSource.Play();
+            
+            Debug.Log($"Playing music: {musicName}");
+        }
     }
 
     public void StopMusic()
     {
-        if (activeSources.ContainsKey("music"))
+        if (musicAudioSource != null)
         {
-            Destroy(activeSources["music"].gameObject);
-            activeSources.Remove("music");
+            musicAudioSource.Stop();
         }
     }
 
     public void SetMasterVolume(float volume)
     {
         masterVolume = Mathf.Clamp01(volume);
+        if (musicAudioSource != null) musicAudioSource.volume = masterVolume;
+        if (sfxAudioSource != null) sfxAudioSource.volume = masterVolume;
     }
 }
